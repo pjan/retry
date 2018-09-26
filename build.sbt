@@ -10,7 +10,8 @@ lazy val buildSettings = Seq(
 lazy val commonSettings = Seq(
   incOptions := incOptions.value.withLogRecompileOnMacro(false),
   libraryDependencies ++= Seq(
-    compilerPlugin(D.betterMonadicFor)
+    compilerPlugin(D.betterMonadicFor),
+    compilerPlugin(D.kindProjector)
   ),
   scalacOptions ++= commonScalacOptions,
   scalacOptions in (Compile, doc) := (scalacOptions in (Compile, doc)).value
@@ -86,6 +87,7 @@ lazy val D = new {
 
     // Compiler
     val betterMonadicFor = "0.2.4"
+    val kindProjector    = "0.9.7"
 
   }
 
@@ -94,6 +96,7 @@ lazy val D = new {
 
   // Compiler plugins
   lazy val betterMonadicFor = "com.olegpy"     %% "better-monadic-for" % Versions.betterMonadicFor
+  lazy val kindProjector    = "org.spire-math" %% "kind-projector"     % Versions.kindProjector
 
   // Test
   lazy val scalaTest      = "org.scalatest"     %% "scalatest"        % Versions.scalaTest

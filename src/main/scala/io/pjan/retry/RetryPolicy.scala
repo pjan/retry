@@ -2,9 +2,11 @@ package io.pjan.retry
 
 import cats.{ Applicative, Monad, Monoid }
 import cats.data.StateT
+import cats.instances.list._
+import cats.syntax.applicative._
+import cats.syntax.apply._
 import cats.syntax.functor._
 import cats.syntax.traverse._
-import cats.instances.list._
 
 import scala.annotation._
 import scala.concurrent.duration._
@@ -31,27 +33,21 @@ object RetryPolicy {
         policy
     }
 
-  def lift[F[_]](
+  def lift[F[_]: Applicative](
       policy: RetryContext => RetryStatus
-  )(
-      implicit
-      F: Applicative[F]
   ): RetryPolicy[F] =
     new RetryPolicy[F] {
       def run: RetryContext => F[RetryStatus] =
-        ctx => F.pure(policy(ctx))
+        ctx => policy(ctx).pure[F]
     }
 
-  private def monoid[F[_]](
+  private def monoid[F[_]: Applicative](
       rpMonoid: Monoid[RetryStatus]
-  )(
-      implicit
-      F: Applicative[F]
   ): Monoid[RetryPolicy[F]] =
     new Monoid[RetryPolicy[F]] {
       override val empty: RetryPolicy[F] =
         RetryPolicy[F] { ctx =>
-          F.pure(rpMonoid.empty)
+          rpMonoid.empty.pure[F]
         }
 
       override def combine(
@@ -59,10 +55,7 @@ object RetryPolicy {
           y: RetryPolicy[F]
       ): RetryPolicy[F] =
         RetryPolicy[F] { ctx =>
-          F.map2(
-            x.run(ctx),
-            y.run(ctx)
-          ) {
+          (x.run(ctx), y.run(ctx)).mapN {
             case (xrpd, yrpd) => rpMonoid.combine(xrpd, yrpd)
           }
         }
@@ -74,29 +67,39 @@ object RetryPolicy {
   def maxMonoid[F[_]: Applicative]: Monoid[RetryPolicy[F]] =
     monoid[F](RetryStatus.MaxMonoid)
 
-  def constantDelay[F[_]: Applicative](delay: FiniteDuration): RetryPolicy[F] =
+  def constantDelay[F[_]: Applicative](
+      delay: FiniteDuration
+  ): RetryPolicy[F] =
     lift { ctx =>
       RetryStatus.Retry(delay)
     }
 
-  def exponentialBackoff[F[_]: Applicative](baseDelay: FiniteDuration): RetryPolicy[F] =
+  def exponentialBackoff[F[_]: Applicative](
+      baseDelay: FiniteDuration
+  ): RetryPolicy[F] =
     lift { ctx =>
       RetryStatus.Retry(baseDelay * scala.math.pow(2, ctx.nrOfRetries).toLong)
     }
 
-  def fibonacciBackoff[F[_]: Applicative](baseDelay: FiniteDuration): RetryPolicy[F] =
+  def fibonacciBackoff[F[_]: Applicative](
+      baseDelay: FiniteDuration
+  ): RetryPolicy[F] =
     lift { ctx =>
       RetryStatus.Retry(baseDelay * fib(ctx.nrOfRetries))
     }
 
-  def fullJitterBackoff[F[_]: Applicative](baseDelay: FiniteDuration): RetryPolicy[F] =
+  def fullJitterBackoff[F[_]: Applicative](
+      baseDelay: FiniteDuration
+  ): RetryPolicy[F] =
     lift { ctx =>
       val d      = (baseDelay * Math.pow(2, ctx.nrOfRetries).toLong) / 2
       val jitter = d * (scala.util.Random.nextDouble())
       RetryStatus.Retry(baseDelay + FiniteDuration(jitter.toNanos, NANOSECONDS))
     }
 
-  def limitByRetries[F[_]: Applicative](limit: Int): RetryPolicy[F] =
+  def limitByRetries[F[_]: Applicative](
+      limit: Int
+  ): RetryPolicy[F] =
     lift { ctx =>
       if (ctx.nrOfRetries >= limit) RetryStatus.Stop else RetryStatus.Retry(Duration.Zero)
     }
@@ -125,12 +128,9 @@ object RetryPolicy {
       }
     }
 
-  def simulate[F[_]](
+  def simulate[F[_]: Monad](
       retryPolicy: RetryPolicy[F],
       nrOfRetries: Int
-  )(
-      implicit
-      M: Monad[F]
   ): F[List[(Int, RetryStatus)]] =
     (1 to nrOfRetries).toList
       .traverse { i =>

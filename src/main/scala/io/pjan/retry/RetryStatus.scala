@@ -1,6 +1,7 @@
 package io.pjan.retry
 
 import cats.{ Eq, Monoid }
+
 import scala.concurrent.duration._
 
 /**
@@ -23,7 +24,7 @@ import scala.concurrent.duration._
   */
 sealed trait RetryStatus
 object RetryStatus {
-  final case object Stop extends RetryStatus
+  case object Stop extends RetryStatus
   final case class Retry(
       delay: FiniteDuration
   ) extends RetryStatus

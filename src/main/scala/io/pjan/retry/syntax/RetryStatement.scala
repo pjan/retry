@@ -2,6 +2,7 @@ package io.pjan.retry.syntax
 
 import cats.{ Monad, MonadError }
 import cats.effect.Timer
+import cats.syntax.applicative._
 
 import io.pjan.retry._
 
@@ -19,7 +20,7 @@ final class RetryStatement[F[_], A](
   ): F[A] =
     Retry.on[F, A, E](
       retryPolicy = policy,
-      shouldRetry = _ => { ea: Either[E, A] => M.pure(shouldRetry(ea)) },
+      shouldRetry = _ => { ea: Either[E, A] => shouldRetry(ea).pure[F] },
       action = _ => statement
     )
 
@@ -32,7 +33,7 @@ final class RetryStatement[F[_], A](
   ): F[A] =
     Retry.onResult[F, A](
       retryPolicy = policy,
-      shouldRetry = _ => { a: A => M.pure(shouldRetry(a)) },
+      shouldRetry = _ => { a: A => shouldRetry(a).pure[F] },
       action = _ => statement
     )
 
@@ -45,7 +46,7 @@ final class RetryStatement[F[_], A](
   ): F[A] =
     Retry.onError[F, A, E](
       retryPolicy = policy,
-      shouldRetry = _ => { e: E => M.pure(shouldRetry(e)) },
+      shouldRetry = _ => { e: E => shouldRetry(e).pure[F] },
       action = _ => statement
     )
 
@@ -56,7 +57,7 @@ final class RetryStatement[F[_], A](
   ): F[A] =
     Retry.onError[F, A, E](
       retryPolicy = policy,
-      shouldRetry = _ => { _: E => M.pure(true) },
+      shouldRetry = _ => { _: E => true.pure },
       action = _ => statement
     )
 }
